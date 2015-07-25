@@ -294,7 +294,6 @@ begin
   else
     result := F_state.seed + PRIME64_5;
 
-  // result := result + F_state.total_len;
   Inc(result, F_state.total_len);
 
   ptrBuffer := F_state.ptrmemory;
@@ -335,5 +334,7 @@ begin
   result := (value shl count) or (value shr (64 - count));
 
 end;
+
+{$POINTERMATH OFF}
 
 end.

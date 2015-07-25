@@ -10,7 +10,7 @@ A Pure Pascal Implementation of [xxHash](https://github.com/Cyan4973/xxHash)
       SysUtils, xxHash32; // for 64bit xxHash, use xxHash64
 
 	var
-      input : TBytes; // note that input can be any data type
+      input : TBytes; // note that input can be any data type like TBytes or String
       hash : TxxHash32; // for 64bit xxHash, use TxxHash64
 
     begin     
