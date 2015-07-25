@@ -1,4 +1,4 @@
-﻿unit xxHash32;
+unit xxHash32;
 
 {
   Copyright (c) 2015 Ugochukwu Mmaduekwe ugo4brain@gmail.com
@@ -22,6 +22,11 @@
 
 }
 
+{ Special thanks to Johan Bontes for helping me out with benchmarking and
+  various optimizations and corrections. }
+
+{$POINTERMATH ON}
+
 interface
 
 uses
@@ -32,9 +37,8 @@ type
   TxxHash32 = class
   strict private
 
-    function CalcSubHash(value: LongWord; buf: TBytes; index: Integer)
-      : LongWord;
-    function RotateLeft(value: LongWord; count: Integer): LongWord;
+    class function RotateLeft32(value: LongWord; count: Integer): LongWord;
+      static; inline;
 
   type
 
@@ -49,10 +53,11 @@ type
       v3: LongWord;
       v4: LongWord;
       memsize: LongWord;
-      memory: TBytes;
+      ptrmemory: Pointer;
 
     end;
 
+  class var
   const
     PRIME32_1: LongWord = 2654435761;
     PRIME32_2: LongWord = 2246822519;
@@ -61,15 +66,15 @@ type
     PRIME32_5: LongWord = 374761393;
 
   protected
-    _state: TXXH_State;
+    F_state: TXXH_State;
 
   public
     constructor Create();
     destructor Destroy(); Override;
     procedure Init(seed: LongWord = 0);
-    function Update(input: TBytes; len: LongWord): Boolean;
-    function CalculateHash(buf: TBytes; len: LongWord = 0; seed: LongWord = 0)
-      : LongWord;
+    function Update(const input; len: Integer): Boolean;
+    class function CalculateHash32(const HashData; len: Integer = 0;
+      seed: LongWord = 0): LongWord; static;
     function Digest(): LongWord;
 
   end;
@@ -84,206 +89,155 @@ end;
 
 destructor TxxHash32.Destroy();
 begin
-  _state.memory := Nil;
+
+  FreeMem(F_state.ptrmemory, 16);
   inherited Destroy;
-end;
-
-function TxxHash32.CalculateHash(buf: TBytes; len: LongWord = 0;
-  seed: LongWord = 0): LongWord;
-var
-  v1, v2, v3, v4, bitconverted: LongWord;
-  index, limit: Integer;
-begin
-  bitconverted := 0;
-  index := 0;
-  if (len = 0) then
-
-    len := Length(buf);
-
-  if (len >= 16) then
-
-  begin
-    limit := len - 16;
-    v1 := seed + PRIME32_1 + PRIME32_2;
-    v2 := seed + PRIME32_2;
-    v3 := seed + 0;
-    v4 := seed - PRIME32_1;
-
-    while (index <= limit) do
-    begin
-      v1 := CalcSubHash(v1, buf, index);
-      Inc(index, 4);
-      v2 := CalcSubHash(v2, buf, index);
-      Inc(index, 4);
-      v3 := CalcSubHash(v3, buf, index);
-      Inc(index, 4);
-      v4 := CalcSubHash(v4, buf, index);
-      Inc(index, 4);
-    end;
-
-    result := RotateLeft(v1, 1) + RotateLeft(v2, 7) + RotateLeft(v3, 12) +
-      RotateLeft(v4, 18);
-  end
-  else
-  begin
-    result := seed + PRIME32_5;
-  end;
-
-  result := result + len;
-
-  while (LongWord(index) <= len - 4) do
-  begin
-
-    // Replication of CSharp's BitConverter.ToUInt32 method.
-    Move(buf[index], bitconverted, 4);
-    result := result + (bitconverted * PRIME32_3);
-    result := RotateLeft(result, 17) * PRIME32_4;
-    Inc(index, 4);
-
-  end;
-
-  while (LongWord(index) < len) do
-  begin
-    result := result + buf[index] * PRIME32_5;
-    result := RotateLeft(result, 11) * PRIME32_1;
-    Inc(index);
-  end;
-
-  result := result xor (result shr 15);
-  result := result * PRIME32_2;
-  result := result xor (result shr 13);
-  result := result * PRIME32_3;
-  result := result xor (result shr 16);
-
 end;
 
 procedure TxxHash32.Init(seed: LongWord = 0);
 begin
 
-  _state.seed := seed;
-  _state.v1 := seed + PRIME32_1 + PRIME32_2;
-  _state.v2 := seed + PRIME32_2;
-  _state.v3 := seed + 0;
-  _state.v4 := seed - PRIME32_1;
-  _state.total_len := 0;
-  _state.memsize := 0;
-  SetLength(_state.memory, 16);
+  F_state.seed := seed;
+  F_state.v1 := seed + PRIME32_1 + PRIME32_2;
+  F_state.v2 := seed + PRIME32_2;
+  F_state.v3 := seed + 0;
+  F_state.v4 := seed - PRIME32_1;
+  F_state.total_len := 0;
+  F_state.memsize := 0;
+  GetMem(F_state.ptrmemory, 16);
 
 end;
 
-function TxxHash32.Update(input: TBytes; len: LongWord): Boolean;
-
+function TxxHash32.Update(const input; len: Integer): Boolean;
 var
-  index, limit: Integer;
   v1, v2, v3, v4: LongWord;
-begin
-  index := 0;
-  _state.total_len := _state.total_len + len;
+  ptrBuffer, ptrTemp, ptrEnd, ptrLimit: Pointer;
 
-  if ((_state.memsize + len) < 16) then
+begin
+
+  ptrBuffer := @input;
+
+  F_state.total_len := F_state.total_len + UInt64(len);
+
+  if ((F_state.memsize + UInt32(len)) < UInt32(16)) then
   begin
 
-    // Some pointer black magic :) similar to CSharp's Array.Copy.
-    Move((@input[0])^, (@_state.memory[_state.memsize])^, len);
+    ptrTemp := Pointer(NativeUInt(F_state.ptrmemory) + F_state.memsize);
 
-    _state.memsize := _state.memsize + len;
+    Move(ptrBuffer^, ptrTemp^, len);
+
+    F_state.memsize := F_state.memsize + UInt32(len);
 
     result := True;
     Exit;
   end;
 
-  if (_state.memsize > 0) then
+  ptrEnd := Pointer(NativeUInt(ptrBuffer) + UInt32(len));
+
+  if F_state.memsize > 0 then
   begin
+    ptrTemp := Pointer(NativeUInt(F_state.ptrmemory) + F_state.memsize);
+    Move(ptrBuffer^, ptrTemp^, 16 - F_state.memsize);
 
-    // Some pointer black magic :) similar to CSharp's Array.Copy.
-    Move((@input[0])^, (@_state.memory[_state.memsize])^, 16 - _state.memsize);
+    F_state.v1 := PRIME32_1 * RotateLeft32(F_state.v1 + PRIME32_2 *
+      PLongWord(F_state.ptrmemory)^, 13);
+    F_state.v2 := PRIME32_1 * RotateLeft32(F_state.v2 + PRIME32_2 *
+      PLongWord(NativeUInt(F_state.ptrmemory) + 4)^, 13);
+    F_state.v3 := PRIME32_1 * RotateLeft32(F_state.v3 + PRIME32_2 *
+      PLongWord(NativeUInt(F_state.ptrmemory) + 8)^, 13);
+    F_state.v4 := PRIME32_1 * RotateLeft32(F_state.v4 + PRIME32_2 *
+      PLongWord(NativeUInt(F_state.ptrmemory) + 12)^, 13);
 
-    _state.v1 := CalcSubHash(_state.v1, _state.memory, index);
-    Inc(index, 4);
-    _state.v2 := CalcSubHash(_state.v2, _state.memory, index);
-    Inc(index, 4);
-    _state.v3 := CalcSubHash(_state.v3, _state.memory, index);
-    Inc(index, 4);
-    _state.v4 := CalcSubHash(_state.v4, _state.memory, index);
-
-    index := 0;
-    _state.memsize := 0;
+    ptrBuffer := Pointer(NativeUInt(ptrBuffer) + (16 - F_state.memsize));
+    F_state.memsize := 0;
   end;
 
-  if (LongWord(index) <= len - 16) then
+  if NativeUInt(ptrBuffer) <= (NativeUInt(ptrEnd) - 16) then
   begin
+    v1 := F_state.v1;
+    v2 := F_state.v2;
+    v3 := F_state.v3;
+    v4 := F_state.v4;
 
-    limit := len - 16;
-    v1 := _state.v1;
-    v2 := _state.v2;
-    v3 := _state.v3;
-    v4 := _state.v4;
+    ptrLimit := Pointer(NativeUInt(ptrEnd) - 16);
+    repeat
+      v1 := PRIME32_1 * RotateLeft32(v1 + PRIME32_2 *
+        PLongWord(ptrBuffer)^, 13);
+      v2 := PRIME32_1 * RotateLeft32(v2 + PRIME32_2 *
+        PLongWord(NativeUInt(ptrBuffer) + 4)^, 13);
+      v3 := PRIME32_1 * RotateLeft32(v3 + PRIME32_2 *
+        PLongWord(NativeUInt(ptrBuffer) + 8)^, 13);
+      v4 := PRIME32_1 * RotateLeft32(v4 + PRIME32_2 *
+        PLongWord(NativeUInt(ptrBuffer) + 12)^, 13);
+      Inc(NativeUInt(ptrBuffer), 16);
+    until not(NativeUInt(ptrBuffer) <= NativeUInt(ptrLimit));
 
-    while (index <= limit) do
-    begin
-      v1 := CalcSubHash(v1, input, index);
-      Inc(index, 4);
-      v2 := CalcSubHash(v2, input, index);
-      Inc(index, 4);
-      v3 := CalcSubHash(v3, input, index);
-      Inc(index, 4);
-      v4 := CalcSubHash(v4, input, index);
-      Inc(index, 4);
-    end;
-
-    _state.v1 := v1;
-    _state.v2 := v2;
-    _state.v3 := v3;
-    _state.v4 := v4;
-
+    F_state.v1 := v1;
+    F_state.v2 := v2;
+    F_state.v3 := v3;
+    F_state.v4 := v4;
   end;
 
-  if (LongWord(index) < len) then
+  if NativeUInt(ptrBuffer) < NativeUInt(ptrEnd) then
   begin
-
-    // Some pointer black magic :) similar to CSharp's Array.Copy.
-    Move((@input[index])^, (@_state.memory[0])^, len - LongWord(index));
-    _state.memsize := len - LongWord(index);
-
+    ptrTemp := F_state.ptrmemory;
+    Move(ptrBuffer^, ptrTemp^, NativeUInt(ptrEnd) - NativeUInt(ptrBuffer));
+    F_state.memsize := NativeUInt(ptrEnd) - NativeUInt(ptrBuffer);
   end;
+
   result := True;
+
 end;
 
-function TxxHash32.Digest(): LongWord;
+class function TxxHash32.CalculateHash32(const HashData; len: Integer = 0;
+  seed: LongWord = 0): LongWord;
 var
-  bitconverted: LongWord;
-  index: Integer;
+  v1, v2, v3, v4: LongWord;
+  ptrLimit, ptrEnd, ptrBuffer: Pointer;
 begin
-  bitconverted := 0;
-  index := 0;
-  if (_state.total_len >= 16) then
+  ptrBuffer := @HashData;
+  ptrEnd := Pointer(NativeUInt(ptrBuffer) + UInt32(len));
 
-    result := RotateLeft(_state.v1, 1) + RotateLeft(_state.v2, 7) +
-      RotateLeft(_state.v3, 12) + RotateLeft(_state.v4, 18)
+  if len >= 16 then
+  begin
+    ptrLimit := Pointer(NativeUInt(ptrEnd) - 16);
+    v1 := seed + PRIME32_1 + PRIME32_2;
+    v2 := seed + PRIME32_2;
+    v3 := seed;
+    v4 := seed - PRIME32_1;
 
+    repeat
+      v1 := PRIME32_1 * RotateLeft32(v1 + PRIME32_2 *
+        PLongWord(ptrBuffer)^, 13);
+      v2 := PRIME32_1 * RotateLeft32(v2 + PRIME32_2 *
+        PLongWord(NativeUInt(ptrBuffer) + 4)^, 13);
+      v3 := PRIME32_1 * RotateLeft32(v3 + PRIME32_2 *
+        PLongWord(NativeUInt(ptrBuffer) + 8)^, 13);
+      v4 := PRIME32_1 * RotateLeft32(v4 + PRIME32_2 *
+        PLongWord(NativeUInt(ptrBuffer) + 12)^, 13);
+      Inc(NativeUInt(ptrBuffer), 16);
+    until not(NativeUInt(ptrBuffer) <= NativeUInt(ptrLimit));
+
+    result := RotateLeft32(v1, 1) + RotateLeft32(v2, 7) + RotateLeft32(v3, 12) +
+      RotateLeft32(v4, 18);
+  end
   else
+    result := seed + PRIME32_5;
+
+  Inc(result, UInt32(len));
+
+  while (NativeUInt(ptrBuffer) + 4) <= (NativeUInt(ptrEnd)) do
   begin
-    result := _state.seed + PRIME32_5;
+    result := result + PLongWord(ptrBuffer)^ * PRIME32_3;
+    result := RotateLeft32(result, 17) * PRIME32_4;
+    Inc(NativeUInt(ptrBuffer), 4);
   end;
 
-  result := result + LongWord(_state.total_len);
-
-  while (LongWord(index) + 4 <= _state.memsize) do
-
+  while NativeUInt(ptrBuffer) < NativeUInt(ptrEnd) do
   begin
-
-    // Replication of CSharp's BitConverter.ToUInt32 method.
-    Move(_state.memory[index], bitconverted, 4);
-    result := result + (bitconverted * PRIME32_3);
-    result := RotateLeft(result, 17) * PRIME32_4;
-    Inc(index, 4);
-  end;
-
-  while (LongWord(index) < _state.memsize) do
-  begin
-    result := result + _state.memory[index] * PRIME32_5;
-    result := RotateLeft(result, 11) * PRIME32_1;
-    Inc(index);
+    result := result + PByte(ptrBuffer)^ * PRIME32_5;
+    result := RotateLeft32(result, 11) * PRIME32_1;
+    Inc(NativeUInt(ptrBuffer));
   end;
 
   result := result xor (result shr 15);
@@ -293,25 +247,48 @@ begin
   result := result xor (result shr 16);
 end;
 
-function TxxHash32.CalcSubHash(value: LongWord; buf: TBytes; index: Integer)
-  : LongWord;
+function TxxHash32.Digest: LongWord;
 var
-  read_value: LongWord;
+  ptrBuffer, ptrEnd: Pointer;
 begin
-  read_value := 0;
-  Move(buf[index], read_value, 4);
-  value := value + (read_value * PRIME32_2);
-  value := RotateLeft(value, 13);
-  value := value * PRIME32_1;
-  result := value;
+  if F_state.total_len >= UInt64(16) then
+    result := RotateLeft32(F_state.v1, 1) + RotateLeft32(F_state.v2, 7) +
+      RotateLeft32(F_state.v3, 12) + RotateLeft32(F_state.v4, 18)
+  else
+    result := F_state.seed + PRIME32_5;
+  Inc(result, F_state.total_len);
 
+  ptrBuffer := F_state.ptrmemory;
+  ptrEnd := Pointer(NativeUInt(ptrBuffer) + F_state.memsize);
+  while (NativeUInt(ptrBuffer) + 4) <= (NativeUInt(ptrEnd)) do
+  begin
+    result := result + PLongWord(ptrBuffer)^ * PRIME32_3;
+    result := RotateLeft32(result, 17) * PRIME32_4;
+    Inc(NativeUInt(ptrBuffer), 4);
+  end;
+
+  while NativeUInt(ptrBuffer) < NativeUInt(ptrEnd) do
+  begin
+    result := result + PByte(ptrBuffer)^ * PRIME32_5;
+    result := RotateLeft32(result, 11) * PRIME32_1;
+    Inc(NativeUInt(ptrBuffer));
+  end;
+
+  result := result xor (result shr 15);
+  result := result * PRIME32_2;
+  result := result xor (result shr 13);
+  result := result * PRIME32_3;
+  result := result xor (result shr 16);
 end;
 
-function TxxHash32.RotateLeft(value: LongWord; count: Integer): LongWord;
+class function TxxHash32.RotateLeft32(value: LongWord; count: Integer)
+  : LongWord;
 begin
 
   result := (value shl count) or (value shr (32 - count));
 
 end;
+
+{$POINTERMATH OFF}
 
 end.
