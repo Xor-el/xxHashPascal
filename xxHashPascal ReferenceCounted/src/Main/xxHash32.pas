@@ -1,40 +1,31 @@
 unit xxHash32;
 
-{
-  Copyright (c) 2015 Ugochukwu Mmaduekwe ugo4brain@gmail.com
-
-  This software is provided 'as-is', without any express or implied
-  warranty. In no event will the authors be held liable for any damages
-  arising from the use of this software.
-  Permission is granted to anyone to use this software for any purpose,
-  including commercial applications, and to alter it and redistribute it
-  freely, subject to the following restrictions:
-
-  1. The origin of this software must not be misrepresented; you must not
-  claim that you wrote the original software. If you use this software
-  in a product, an acknowledgment in the product documentation would be
-  appreciated but is not required.
-
-  2. Altered source versions must be plainly marked as such, and must not be
-  misrepresented as being the original software.
-
-  3. This notice may not be removed or altered from any source distribution.
-
-}
-
-{ Special thanks to Johan Bontes for helping me out with benchmarking and
-  various optimizations and corrections. }
-
 {$POINTERMATH ON}
+{$IFDEF FPC}
+{$mode delphi}
+{$ENDIF}
 
 interface
 
 uses
-
-  SysUtils;
+{$IFDEF FPC}
+  SysUtils
+{$ELSE}
+    System.SysUtils
+{$ENDIF};
 
 type
-  TxxHash32 = class
+
+  IIxxHash32 = interface
+    ['{E3747A4F-7C89-4643-BF4C-EAE1F6E0DA48}']
+
+    procedure Init(seed: LongWord = 0);
+    function Update(const input; len: Integer): Boolean;
+    function Digest(): LongWord;
+
+  end;
+
+  TxxHash32 = class(TInterfacedObject, IIxxHash32)
   strict private
 
     class function RotateLeft32(value: LongWord; count: Integer): LongWord;
@@ -43,9 +34,9 @@ type
   type
 
     TXXH_State = Record
-{$IFNDEF FPC}
+
     private
-{$ENDIF}
+
       total_len: UInt64;
       seed: LongWord;
       v1: LongWord;

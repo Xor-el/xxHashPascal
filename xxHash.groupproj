@@ -1,0 +1,60 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{0D5F2C20-B2CF-4FED-B6EC-70D72CF36EB4}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="xxHash.Test\xxHashTest.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="xxHashPascal Normal\xxHashNormal.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="xxHashPascal ReferenceCounted\xxHashPascalReferenceCounted.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="xxHashTest">
+        <MSBuild Projects="xxHash.Test\xxHashTest.dproj"/>
+    </Target>
+    <Target Name="xxHashTest:Clean">
+        <MSBuild Projects="xxHash.Test\xxHashTest.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="xxHashTest:Make">
+        <MSBuild Projects="xxHash.Test\xxHashTest.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="xxHashNormal">
+        <MSBuild Projects="xxHashPascal Normal\xxHashNormal.dproj"/>
+    </Target>
+    <Target Name="xxHashNormal:Clean">
+        <MSBuild Projects="xxHashPascal Normal\xxHashNormal.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="xxHashNormal:Make">
+        <MSBuild Projects="xxHashPascal Normal\xxHashNormal.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="xxHashPascalReferenceCounted">
+        <MSBuild Projects="xxHashPascal ReferenceCounted\xxHashPascalReferenceCounted.dproj"/>
+    </Target>
+    <Target Name="xxHashPascalReferenceCounted:Clean">
+        <MSBuild Projects="xxHashPascal ReferenceCounted\xxHashPascalReferenceCounted.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="xxHashPascalReferenceCounted:Make">
+        <MSBuild Projects="xxHashPascal ReferenceCounted\xxHashPascalReferenceCounted.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="xxHashTest;xxHashNormal;xxHashPascalReferenceCounted"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="xxHashTest:Clean;xxHashNormal:Clean;xxHashPascalReferenceCounted:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="xxHashTest:Make;xxHashNormal:Make;xxHashPascalReferenceCounted:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
