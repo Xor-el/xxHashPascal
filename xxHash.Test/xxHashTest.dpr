@@ -9,7 +9,6 @@ uses
 {$IFDEF TESTINSIGHT}
   TestInsight.DUnitX,
 {$ENDIF }
-  DUnitX.Init,
   DUnitX.Loggers.Console,
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
