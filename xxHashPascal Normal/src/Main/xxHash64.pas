@@ -1,8 +1,6 @@
 unit xxHash64;
 
-
 {$POINTERMATH ON}
-
 {$IFDEF FPC}
 {$mode delphi}
 {$ENDIF}
@@ -17,6 +15,8 @@ uses
 {$ENDIF};
 
 type
+  PUInt64 = ^UInt64;
+
   TxxHash64 = class
   strict private
 

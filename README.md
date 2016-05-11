@@ -5,7 +5,7 @@
 
 #### Building
 This project was created using Delphi 10 Seattle Update 1 but should compile in 
-any Delphi version from XE3 and FreePascal 2.6 Upwards.
+any Delphi version from XE3 and FreePascal 2.6.4 Upwards.
 This Library has two variants (Reference Counted version and Non Reference counted version).
 
 

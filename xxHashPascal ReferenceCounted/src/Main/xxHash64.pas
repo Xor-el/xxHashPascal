@@ -16,6 +16,8 @@ uses
 
 type
 
+  PUInt64 = ^UInt64;
+
   IIxxHash64 = interface
     ['{3AE40E4C-5259-451D-B57F-2B27202EFB8A}']
 
