@@ -1,3 +1,5 @@
+#### Please considering porting over to [HashLib4Pascal](https://github.com/Xor-el/HashLib4Pascal) as XXHash is already implemented there and this repo is no longer maintained.
+
 #xxHashPascal#
 
 **This is a Port of [xxHash](https://github.com/Cyan4973/xxHash) to Delphi/Pascal.**
